@@ -6,7 +6,19 @@ const app = express();
 app.use(express.json());
 
 // Token via variável de ambiente
-const PAGBANK_TOKEN = process.env.PAGBANK_TOKEN;
+let PAGBANK_TOKEN = process.env.PAGBANK_TOKEN;
+
+// Função para limpar o token
+const cleanToken = (token) => token?.trim().replace(/\r?\n|\r/g, "");
+
+// Middleware para checar token
+app.use((req, res, next) => {
+  PAGBANK_TOKEN = cleanToken(PAGBANK_TOKEN);
+  if (!PAGBANK_TOKEN) {
+    return res.status(500).json({ error: "Token PagBank não definido" });
+  }
+  next();
+});
 
 // Criar cobrança PIX
 app.post("/vip/purchase", async (req, res) => {
@@ -34,9 +46,7 @@ app.post("/vip/purchase", async (req, res) => {
         ],
         qr_codes: [
           {
-            amount: {
-              value: 1000,
-            },
+            amount: { value: 1000 },
           },
         ],
       },
