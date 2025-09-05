@@ -44,9 +44,11 @@ app.post("/vip/purchase", async (req, res) => {
             unit_amount: 1000, // R$ 10,00 em centavos
           },
         ],
-        payment_method: {
-          type: "PIX"
-        }
+        payments: [
+          {
+            type: "PIX",
+          },
+        ],
       },
       {
         headers: {
@@ -56,19 +58,17 @@ app.post("/vip/purchase", async (req, res) => {
       }
     );
 
-    // Extrair código Pix para copy & paste
-    const pixCode = response.data.payments?.[0]?.pix?.copy_and_paste_code;
-
+    const payment = response.data.payments?.[0]?.pix || {};
     res.json({
       id: response.data.id,
-      pixCode: pixCode || "",
+      pixCode: payment.copy_and_paste_code || "",
+      qrImageBase64: payment.qr_code?.base64 || "", // se quiser mostrar QR no app
     });
   } catch (error) {
     console.error(error.response?.data || error.message);
     res.status(500).json({ error: "Erro ao criar cobrança" });
   }
 });
-
 
 // Verificar status do pagamento
 app.get("/vip/confirm/:id", async (req, res) => {
@@ -97,4 +97,3 @@ app.get("/vip/confirm/:id", async (req, res) => {
 // Porta dinâmica do Render
 const port = process.env.PORT || 3000;
 app.listen(port, () => console.log(`Servidor rodando na porta ${port}`));
-
