@@ -1,19 +1,24 @@
+// server.js
 const express = require("express");
 const axios = require("axios");
 
 const app = express();
 app.use(express.json());
 
-// Coloque seu token aqui
-const PAGBANK_TOKEN = "ccbd38b0-97e8-41e8-8454-182a7eb5491ce42bd9cb4fa6ac2410880d3a2f06a495a404-0f41-4ae5-aed6-aeb9b3b427ea";
+// Token via variável de ambiente
+const PAGBANK_TOKEN = process.env.PAGBANK_TOKEN;
 
 // Criar cobrança PIX
 app.post("/vip/purchase", async (req, res) => {
   const { userId, plan } = req.body;
 
+  if (!userId || !plan) {
+    return res.status(400).json({ error: "userId e plan são obrigatórios" });
+  }
+
   try {
     const response = await axios.post(
-      "https://sandbox.api.pagseguro.com/orders", // Troque para produção depois
+      "https://sandbox.api.pagseguro.com/orders", // Sandbox
       {
         reference_id: `vip-${userId}`,
         customer: {
@@ -24,7 +29,7 @@ app.post("/vip/purchase", async (req, res) => {
           {
             name: `Plano VIP ${plan}`,
             quantity: 1,
-            unit_amount: 1000, // em centavos → R$ 10,00
+            unit_amount: 1000, // R$ 10,00 em centavos
           },
         ],
         qr_codes: [
@@ -54,6 +59,8 @@ app.post("/vip/purchase", async (req, res) => {
 app.get("/vip/confirm/:id", async (req, res) => {
   const { id } = req.params;
 
+  if (!id) return res.status(400).json({ error: "ID da cobrança é obrigatório" });
+
   try {
     const response = await axios.get(
       `https://sandbox.api.pagseguro.com/orders/${id}`,
@@ -64,7 +71,7 @@ app.get("/vip/confirm/:id", async (req, res) => {
       }
     );
 
-    const status = response.data.status; // PAID, WAITING, etc
+    const status = response.data.status; // WAITING, PAID, etc
     res.json({ success: status === "PAID", status });
   } catch (error) {
     console.error(error.response?.data || error.message);
@@ -72,4 +79,6 @@ app.get("/vip/confirm/:id", async (req, res) => {
   }
 });
 
-app.listen(3000, () => console.log("Servidor rodando na porta 3000"));
+// Porta dinâmica do Render
+const port = process.env.PORT || 3000;
+app.listen(port, () => console.log(`Servidor rodando na porta ${port}`));
