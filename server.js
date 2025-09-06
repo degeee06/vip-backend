@@ -57,9 +57,10 @@ app.post('/vip/purchase', validateBody(['userId', 'plan']), async (req, res) => 
       qrImageBase64: payment.qr_code?.base64 || "",
     });
   } catch (err) {
-    console.error(err.response?.data || err.message);
-    res.status(500).json({ error: "Erro ao criar cobrança" });
-  }
+  console.error("Erro completo:", err.response?.data || err.message || err);
+  res.status(500).json({ error: err.response?.data || err.message || "Erro ao criar cobrança" });
+ }
+
 });
 
 // --- Confirmar pagamento ---
@@ -88,3 +89,4 @@ app.use((err, req, res, next) => {
 // --- Porta dinâmica do Render ---
 const port = process.env.PORT || 3000;
 app.listen(port, () => console.log(`Servidor rodando na porta ${port}`));
+
