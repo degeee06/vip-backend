@@ -80,6 +80,8 @@ app.use((err, req, res, next) => {
 });
 
 // Porta dinâmica do Render
-const port = process.env.PORT || 10000;
+const port = process.env.PORT; // Render fornece a porta automaticamente
 app.listen(port, () => console.log(`Servidor rodando na porta ${port}`));
+
+
 
