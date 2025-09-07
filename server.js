@@ -11,20 +11,16 @@ app.use(cors());
 app.use(express.json());
 app.use(morgan('combined'));
 
-// --- Token PagBank ---
-let PAGBANK_TOKEN = process.env.PAGBANK_TOKEN;
-
-// Função para limpar token de quebras de linha
+// --- Token Efí Bank ---
+let EFI_TOKEN = process.env.EFI_TOKEN;
 const cleanToken = (token) => token?.trim().replace(/\r?\n|\r/g, "");
-
-// Middleware para checar se o token está definido
 app.use((req, res, next) => {
-  PAGBANK_TOKEN = cleanToken(PAGBANK_TOKEN);
-  if (!PAGBANK_TOKEN) return res.status(500).json({ error: "Token PagBank não definido" });
+  EFI_TOKEN = cleanToken(EFI_TOKEN);
+  if (!EFI_TOKEN) return res.status(500).json({ error: "Token Efí Bank não definido" });
   next();
 });
 
-// Middleware de validação simples de body
+// Middleware de validação simples
 const validateBody = (requiredFields) => (req, res, next) => {
   const missing = requiredFields.filter(f => !req.body[f]);
   if (missing.length > 0) return res.status(400).json({ error: `Campos obrigatórios faltando: ${missing.join(', ')}` });
@@ -37,56 +33,54 @@ app.post('/vip/purchase', validateBody(['userId', 'plan']), async (req, res) => 
 
   try {
     const response = await axios.post(
-      'https://api.pagseguro.com/orders', // PRODUÇÃO
+      'https://sandbox.efiapi.com.br/v1/pix/charge', // substitua pelo endpoint produção quando estiver pronto
       {
-        reference_id: `vip-${userId}`,
-        customer: { 
-          name: req.body.name || "Cliente VIP", 
-          email: req.body.email || "cliente@email.com" // deve ser real
+        value: req.body.value || 20.0,
+        description: `Plano VIP ${plan}`,
+        customer: {
+          name: req.body.name || "Cliente VIP",
+          email: req.body.email || "cliente@email.com"
         },
-        items: [{ name: `Plano VIP ${plan}`, quantity: 1, unit_amount: 1000 }], // valor em centavos
-        payments: [{ type: "PIX" }],
+        expiration: 3600 // 1 hora
       },
-      { headers: { Authorization: `Bearer ${PAGBANK_TOKEN}`, "Content-Type": "application/json" } }
+      { headers: { Authorization: `Bearer ${EFI_TOKEN}` } }
     );
 
-    const payment = response.data.payments?.[0]?.pix || {};
     res.json({
-      id: response.data.id,
-      pixCode: payment.copy_and_paste_code || "",
-      qrImageBase64: payment.qr_code?.base64 || "",
+      chargeId: response.data.chargeId,
+      qrCode: response.data.qrCode, // base64 do QR
+      pixCode: response.data.pixKey // código Pix para copiar e colar
     });
   } catch (err) {
-  console.error("Erro completo:", err.response?.data || err.message || err);
-  res.status(500).json({ error: err.response?.data || err.message || "Erro ao criar cobrança" });
- }
-
+    console.error("Erro completo:", err.response?.data || err.message || err);
+    res.status(500).json({ error: err.response?.data || err.message || "Erro ao criar cobrança" });
+  }
 });
 
 // --- Confirmar pagamento ---
-app.get('/vip/confirm/:id', async (req, res) => {
-  const { id } = req.params;
-  if (!id) return res.status(400).json({ error: "ID da cobrança é obrigatório" });
+app.get('/vip/confirm/:chargeId', async (req, res) => {
+  const { chargeId } = req.params;
+  if (!chargeId) return res.status(400).json({ error: "ID da cobrança é obrigatório" });
 
   try {
-    const response = await axios.get(`https://api.pagseguro.com/orders/${id}`, {
-      headers: { Authorization: `Bearer ${PAGBANK_TOKEN}` }
-    });
-    const status = response.data.status;
-    res.json({ success: status === "PAID", status });
+    const response = await axios.get(
+      `https://sandbox.efiapi.com.br/v1/pix/charge/${chargeId}`,
+      { headers: { Authorization: `Bearer ${EFI_TOKEN}` } }
+    );
+
+    res.json({ success: response.data.status === "PAID", status: response.data.status });
   } catch (err) {
     console.error(err.response?.data || err.message);
     res.status(500).json({ error: "Erro ao verificar pagamento" });
   }
 });
 
-// --- Middleware de erro global ---
+// --- Erro global ---
 app.use((err, req, res, next) => {
   console.error(err);
   res.status(err.status || 500).json({ error: err.message || 'Erro interno do servidor' });
 });
 
-// --- Porta dinâmica do Render ---
+// Porta
 const port = process.env.PORT || 3000;
 app.listen(port, () => console.log(`Servidor rodando na porta ${port}`));
-
